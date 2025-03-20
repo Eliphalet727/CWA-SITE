@@ -21,8 +21,6 @@
   (function() {
 
     const BASE_URL = 'https://cwa-site.onrender.com';
-
-    // 想要比較的 county IDs
     const countyIds = [
       63, 64, 65, 66, 67, 68,
       10002, 10004, 10005, 10007, 10008, 10009, 10010,
@@ -30,7 +28,6 @@
       '09007', '09020'
     ];
 
-    // ========== 2. 從後端 Proxy 抓「官網」資料 ==========
     async function fetchOfficialData(countyId) {
       const url = `${BASE_URL}/county/${countyId}`;
       console.log('fetchOfficialData =>', url);
@@ -47,29 +44,21 @@
       }
       data = data.replace(/^var ST = /, '');
 
-      // 2) 以分號 ';' 分段，只取第一段 (就是 {...} )
-      //   data 可能長這樣:  { '65': {...}}; var ObsDate='03/11';
-      //   split(';') => [ "{ '65': {...}}", " var ObsDate='03/11'", ... ]
-      const firstPart = data.split(';')[0].trim();  // => "{ '65': {...}}"
+      const firstPart = data.split(';')[0].trim();  
 
-      // 3) 用 eval 解析這個物件
       let parsedObj;
       try {
         parsedObj = eval(`(${firstPart})`);
-        // eval('({...})') 把它當作 JS object literal 來解析
       } catch (err) {
         console.error(`Failed to eval county=${countyId} data=`, firstPart);
         throw err;
       }
 
-      // 4) 檢查 parsedObj[countyId]
       if (!parsedObj[countyId]) {
         return [];
       }
 
-      // 把裡面的每個測站資訊 map 出來
       return Object.values(parsedObj[countyId]).map(station => {
-        // station.StationID => 可能多於5碼，也可能剛好5碼
         let sid = station.StationID || '';
         if (sid.length >= 5) {
           sid = sid.substring(0, 5);
@@ -81,7 +70,6 @@
       });
     }
 
-    // ========== 3. 從後端 Proxy 抓「OpenData」資料 ==========
     async function fetchOD1() {
       const url = `${BASE_URL}/od1`;
       console.log('fetchOD1 =>', url);
@@ -104,12 +92,9 @@
       return await response.json();
     }
 
-    // ========== 4. 核心比對邏輯 ==========
     async function compareData() {
-      // 顯示當下時間
       document.getElementById('current-time').textContent = new Date().toLocaleString();
 
-      // (A) 取得官網資料 A
       let A = [];
       for (const id of countyIds) {
         try {
@@ -121,7 +106,6 @@
       }
       console.log('官網總清單 A =>', A);
 
-      // 建立 A_map
       const A_map = {};
       A.forEach(station => {
         if (station.stationId) {
@@ -129,7 +113,6 @@
         }
       });
 
-      // (B) 取得 OD 資料 B
       let B = [];
       try {
         const od1Json = await fetchOD1();
@@ -168,7 +151,6 @@
       }
       console.log('OD 總清單 B =>', B);
 
-      // 建立 B_map
       const B_map = {};
       B.forEach(station => {
         if (station.stationId) {
@@ -176,7 +158,6 @@
         }
       });
 
-      // (C) 比對
       const inA_notB = [];
       for (const stationId in A_map) {
         if (!B_map[stationId]) {
@@ -190,7 +171,6 @@
         }
       }
 
-      // (D) 顯示結果
       const aPre = document.getElementById('inA_notB');
       aPre.textContent = inA_notB.length === 0
         ? '無'
@@ -202,7 +182,6 @@
         : inB_notA.map(s => `${s.stationName}\t${s.stationId}`).join('\n');
     }
 
-    // ========== 5. 綁定按鈕觸發比對 ==========
     document.getElementById('compare-btn').addEventListener('click', () => {
       compareData().catch(err => {
         console.error('compareData Error =>', err);
