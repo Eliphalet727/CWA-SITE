@@ -13,12 +13,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// (A) 測試用首頁
 app.get('/', (req, res) => {
   res.send('Hello from the CWA Proxy!');
 });
 
-// (B) Proxy：抓取氣象署官網 JS，ex: /county/63 => 轉送 https://www.cwa.gov.tw/Data/js/Observe/County/63.js
 app.get('/county/:id', async (req, res) => {
   const countyId = req.params.id;
   const url = `https://www.cwa.gov.tw/Data/js/Observe/County/${countyId}.js`;
@@ -29,8 +27,6 @@ app.get('/county/:id', async (req, res) => {
       throw new Error(`HTTP Error: ${response.status}`);
     }
     const text = await response.text();
-    // 回傳原始文字 (JS 字串)
-    // 注意：原檔案是 "var ST = {...};" 形式，前端可能用 eval 處理
     res.type('application/javascript').send(text);
   } catch (err) {
     console.error(err);
@@ -38,7 +34,6 @@ app.get('/county/:id', async (req, res) => {
   }
 });
 
-// (C) Proxy：抓取氣象局 OpenData (範例：O-A0001-001)
 app.get('/od1', async (req, res) => {
   const url = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0001-001?Authorization=rdec-key-123-45678-011121314&format=JSON';
 
@@ -55,7 +50,6 @@ app.get('/od1', async (req, res) => {
   }
 });
 
-// (D) Proxy：抓取氣象局另一個 OpenData (O-A0003-001)，你也可定義多個路由
 app.get('/od3', async (req, res) => {
   const url = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization=rdec-key-123-45678-011121314&format=JSON';
 
@@ -72,7 +66,6 @@ app.get('/od3', async (req, res) => {
   }
 });
 
-// 啟動伺服器
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
