@@ -43,7 +43,7 @@ app.get('/od1', async (req, res) => {
       throw new Error(`HTTP Error: ${response.status}`);
     }
     const data = await response.json();
-    res.json(data);  // 以 JSON 格式回給前端
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -59,7 +59,7 @@ app.get('/od2', async (req, res) => {
       throw new Error(`HTTP Error: ${response.status}`);
     }
     const data = await response.json();
-    res.json(data);  // 以 JSON 格式回給前端
+    res.json(data);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
