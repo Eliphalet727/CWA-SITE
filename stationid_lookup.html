@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>CWA 官網與 Opendata 測站差異比對</title>
+  <style>
+    #station-ids {
+      width: 300px;
+      height: 150px;
+      resize: none;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #aaa;
+      padding: 8px;
+    }
+    th {
+      background-color: #eee;
+    }
+  </style>
+</head>
+<body>
+  <h1>CWA 官網與 Opendata 測站差異比對</h1>
+  <div>
+    <label for="station-ids">請貼上欲查詢的 StationId (一列一個)：</label><br/>
+    <textarea id="station-ids" placeholder="前5碼即可"></textarea>
+  </div>
+
+  <button id="compare-btn">開始比對</button>
+
+  <table id="result-table" style="display:none;">
+    <thead>
+      <tr>
+        <th>StationId</th>
+        <th>在CWA官網天氣</th>
+        <th>在 O-A0001-001（ARMTS）</th>
+        <th>在 O-A0002-001（Rainfall）</th>
+        <th>在 O-A0003-001（MESO）</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+  (function() {
+    const BASE_URL = 'https://cwa-site.onrender.com';
+    const countyIds = [
+      63, 64, 65, 66, 67, 68,
+      10002, 10004, 10005, 10007, 10008, 10009, 10010,
+      10013, 10014, 10015, 10016, 10017, 10018, 10020,
+      '09007', '09020'
+    ];
+
+    async function fetchOfficialData(countyId) {
+      const url = `${BASE_URL}/county/${countyId}`;
+      console.log('fetchOfficialData =>', url);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status} for County ID ${countyId}`);
+      }
+
+      let data = await response.text();
+      if (!data.startsWith('var ST = ')) {
+        throw new Error(`Invalid data format (no 'var ST = ') for County ID ${countyId}`);
+      }
+      data = data.replace(/^var ST = /, '');
+
+      const firstPart = data.split(';')[0].trim();
+
+      let parsedObj;
+      try {
+        parsedObj = eval(`(${firstPart})`);
+      } catch (err) {
+        console.error(`Failed to eval county=${countyId} data=`, firstPart);
+        throw err;
+      }
+
+      if (!parsedObj[countyId]) {
+        return [];
+      }
+
+      return Object.values(parsedObj[countyId]).map(station => {
+        let sid = station.StationID || '';
+        if (sid.length >= 5) {
+          sid = sid.substring(0, 5);
+        }
+        return {
+          stationName: station.StationName.C,
+          stationId: sid
+        };
+      });
+    }
+
+    async function fetchOD1() {
+      const url = `${BASE_URL}/od1`;
+      console.log('fetchOD1 =>', url);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP Error from od1 => ${response.status}`);
+      }
+      return await response.json();
+    }
+
+    async function fetchOD2() {
+      const url = `${BASE_URL}/od2`;
+      console.log('fetchOD2 =>', url);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP Error from od2 => ${response.status}`);
+      }
+      return await response.json();
+    }
+
+    async function fetchOD3() {
+      const url = `${BASE_URL}/od3`;
+      console.log('fetchOD3 =>', url);
+
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP Error from od3 => ${response.status}`);
+      }
+      return await response.json();
+    }
+
+    let cwaMap = {};   // CWA
+    let od1Map = {};   // OD1
+    let od2Map = {};   // OD2
+    let od3Map = {};   // OD3
+
+    async function preloadData() {
+      let A = [];
+      for (const id of countyIds) {
+        try {
+          const stations = await fetchOfficialData(id);
+          A = A.concat(stations);
+        } catch (error) {
+          console.error(`Error fetching official data for County ID ${id}:`, error);
+        }
+      }
+      A.forEach(station => {
+        if (station.stationId) {
+          cwaMap[station.stationId] = true;
+        }
+      });
+      try {
+        const od1Json = await fetchOD1();
+        if (od1Json && od1Json.records && od1Json.records.Station) {
+          od1Json.records.Station.forEach(st => {
+            let sid = st.StationId || '';
+            if (sid.length >= 5) {
+              sid = sid.substring(0,5);
+            }
+            od1Map[sid] = true;
+          });
+        }
+      } catch (err) {
+        console.error('fetchOD1 error =>', err);
+      }
+      try {
+        const od2Json = await fetchOD2();
+        if (od2Json && od2Json.records && od2Json.records.Station) {
+          od2Json.records.Station.forEach(st => {
+            let sid = st.StationId || '';
+            if (sid.length >= 5) {
+              sid = sid.substring(0,5);
+            }
+            od2Map[sid] = true;
+          });
+        }
+      } catch (err) {
+        console.error('fetchOD2 error =>', err);
+      }
+
+      try {
+        const od3Json = await fetchOD3();
+        if (od3Json && od3Json.records && od3Json.records.Station) {
+          od3Json.records.Station.forEach(st => {
+            let sid = st.StationId || '';
+            if (sid.length >= 5) {
+              sid = sid.substring(0,5);
+            }
+            od3Map[sid] = true;
+          });
+        }
+      } catch (err) {
+        console.error('fetchOD3 error =>', err);
+      }
+
+      console.log('CWA Map =>', cwaMap);
+      console.log('OD1 Map =>', od1Map);
+      console.log('OD2 Map =>', od2Map);
+      console.log('OD3 Map =>', od3Map);
+    }
+
+    function generateResultTable(stationIds) {
+      const table = document.getElementById('result-table');
+      const tbody = table.querySelector('tbody');
+      tbody.innerHTML = '';
+      stationIds.forEach(sid => {
+        if (sid.length > 5) {
+          sid = sid.substring(0, 5);
+        }
+        const cwaYes = cwaMap[sid] ? 'Yes' : '';
+        const od1Yes = od1Map[sid] ? 'Yes' : '';
+        const od2Yes = od2Map[sid] ? 'Yes' : '';
+        const od3Yes = od3Map[sid] ? 'Yes' : '';
+        const row = document.createElement('tr');
+        const tdSid = document.createElement('td');
+        tdSid.textContent = sid;
+        const tdCWA = document.createElement('td');
+        tdCWA.textContent = cwaYes;
+        const tdOD1 = document.createElement('td');
+        tdOD1.textContent = od1Yes;
+        const tdOD2 = document.createElement('td');
+        tdOD2.textContent = od2Yes;
+        const tdOD3 = document.createElement('td');
+        tdOD3.textContent = od3Yes;
+        row.appendChild(tdSid);
+        row.appendChild(tdCWA);
+        row.appendChild(tdOD1);
+        row.appendChild(tdOD2);
+        row.appendChild(tdOD3);
+        tbody.appendChild(row);
+      });
+      table.style.display = stationIds.length > 0 ? 'table' : 'none';
+    }
+    document.getElementById('compare-btn').addEventListener('click', () => {
+      const textAreaValue = document.getElementById('station-ids').value.trim();
+      if (!textAreaValue) {
+        alert('請先貼上站碼！');
+        return;
+      }
+      const stationIds = textAreaValue.split(/\r?\n/).map(s => s.trim()).filter(s => s);
+      generateResultTable(stationIds);
+    });
+    preloadData().catch(err => {
+      console.error('preloadData error =>', err);
+      alert('載入後端資料時發生錯誤: ' + err.message);
+    });
+  })();
+  </script>
+</body>
+</html>
